@@ -1,11 +1,13 @@
-gogetter
+# gogetter
 ========
 
 A simple factory girl port with a simple database cleaner interface, in Golang.
 
 Gogetter is designed to be a testing tool.
 
-# Usage
+Serious Api is [here](http://godoc.org/github.com/bom-d-van/gogetter).
+
+## Usage
 
 ```go
 type User struct {
@@ -14,7 +16,7 @@ type User struct {
 }
 
 func init() {
-	SetGoal("User", func() Dream {
+	gogetter.SetGoal("User", func() gogetter.Dream {
 		return User{
 			Id: bson.NewObjectId(),
 			Name: "name",
