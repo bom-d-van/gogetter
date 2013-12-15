@@ -125,6 +125,7 @@ func (s *GoGetterSuite) TestGetWithLessons(c *C) {
 	c.Check(users[0].Name, Equals, "New Name")
 	c.Check(users[0].Dream.Title, Equals, "Conquer the world")
 	c.Check(users[1].Name, Equals, "No.2")
+	c.Check(users[1].Dream.Title, Equals, "My Dream")
 }
 
 func (s *GoGetterSuite) TestGetWithLessonsInPointer(c *C) {
@@ -194,6 +195,36 @@ func (s *GoGetterSuite) TestRealize(c *C) {
 
 	_, err = db.C("users").RemoveAll(bson.M{"_id": bson.M{"$in": []bson.ObjectId{users[0].Id, users[1].Id}}})
 	c.Check(err, Equals, nil)
+}
+
+func (s *GoGetterSuite) TestGetTableName(c *C) {
+	SetGoal("name with space", func() Dream { return nil })
+	SetGoal("Capital", func() Dream { return nil })
+	SetGoal("Capital  and Space", func() Dream { return nil })
+
+	var table string
+	var err error
+	table, err = GetTableName("name with space")
+	c.Check(err, Equals, nil)
+	c.Check(table, Equals, "name_with_spaces")
+	table, err = GetTableName("Capital")
+	c.Check(err, Equals, nil)
+	c.Check(table, Equals, "capitals")
+	table, err = GetTableName("Capital  and Space")
+	c.Check(err, Equals, nil)
+	c.Check(table, Equals, "capital__and_spaces")
+}
+
+func (s *GoGetterSuite) TestRetrieveRecord(c *C) {
+	var record Record
+	puser := User{}
+	record = defaultGetter.retrieveRecord(puser)
+	c.Check(record, Not(Equals), nil)
+	record = defaultGetter.retrieveRecord(&puser)
+	c.Check(record, Not(Equals), nil)
+	ppuser := &User{}
+	record = defaultGetter.retrieveRecord(&ppuser)
+	c.Check(record, Not(Equals), nil)
 }
 
 // func (s *GoGetterSuite) TestGetWithInspiration(c *C) {

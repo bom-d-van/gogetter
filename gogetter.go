@@ -9,10 +9,7 @@ import (
 	"sync"
 )
 
-type Dream interface {
-	// Identity() interface{} // Id
-	// EqualTo(anotherDream Dream) bool
-}
+type Dream interface{}
 type Goal func() Dream
 type Lesson map[string]Dream
 
@@ -36,20 +33,14 @@ var defaultGetter = NewGoGetter(nil)
 var goalMap = map[string]Goal{}
 var tableNameMap = map[string]string{}
 
-// var dreamType = reflect.TypeOf()
-
 // Setting table name is optional, if table name is not specifically setted, gogetter
-// will use the pluralization and lower case form of the name as table name
+// will use the pluralization and lower case form of the name as table name, it will
+// also replace all spaces with underscores.
 func SetTableName(name, table string) {
 	tableNameMap[name] = table
-	// tableNameMap["*"+name] = table
 }
 
 func GetTableName(name string) (table string, err error) {
-	// if len(name) > 0 && name[0] == '*' {
-	// 	name = name[1:]
-	// }
-
 	var ok bool
 	table, ok = tableNameMap[name]
 	if ok {
@@ -61,6 +52,7 @@ func GetTableName(name string) (table string, err error) {
 	}
 
 	table = inflect.Pluralize(strings.ToLower(name))
+	table = strings.Replace(table, " ", "_", -1)
 	tableNameMap[name] = table
 
 	return
@@ -68,6 +60,8 @@ func GetTableName(name string) (table string, err error) {
 
 var mux = sync.Mutex{}
 
+// SetGoal will save the Goal globally, then all gogetter values could share
+// the same set of goals.
 // Note: Leading asterisk (*) in name is saved for gogetter.
 func SetGoal(name string, goal Goal) {
 	mux.Lock()
@@ -78,10 +72,6 @@ func SetGoal(name string, goal Goal) {
 }
 
 func GetGoal(name string) Goal {
-	// if len(name) > 0 && name[0] == '*' {
-	// 	name = name[1:]
-	// }
-
 	goal, ok := goalMap[name]
 	if !ok {
 		return nil
@@ -101,18 +91,18 @@ func Grow(name string, lessons ...Lesson) (Dream, error) {
 	return defaultGetter.Grow(name, lessons...)
 }
 
-// Must calling SetDefaultGetterDb before this
+// Realize is similar
 func Realize(name string, lessons ...Lesson) (dreams Dream, err error) {
 	return defaultGetter.Realize(name, lessons...)
 }
 
-// Must calling SetDefaultGetterDb before this
 func AllInVain(name string, dreams ...Dream) (err error) {
 	return defaultGetter.AllInVain(name, dreams...)
 }
 
-// Could use a leading asterisk (*) in name to get pointer value
-// TODO:
+// Could use a leading asterisk (*) in name to get pointer value.
+//
+// 	TODO:
 // 	1. Support anonymous type, e,g, custom struct, map, etc
 // 	2. Tags specification in custom structs, provided that gogetter will support struct
 func (gg *GoGetter) Grow(name string, lessons ...Lesson) (dreams Dream, err error) {
@@ -126,9 +116,6 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 		}
 	}()
 
-	// if _, ok := goal; !ok {
-	// 	return nil, ErrGetterNotExist
-	// }
 	inPointer := len(name) > 1 && name[0] == '*'
 	if inPointer {
 		name = name[1:]
@@ -220,14 +207,14 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 	}
 
 	table := ""
-	if saveInDb {
+	if saveInDb && gg.db != nil {
 		table, err = GetTableName(name)
 		if err != nil {
 			return
 		}
 	}
 
-	if saveInDb {
+	if saveInDb && gg.db != nil {
 		records := []interface{}{}
 		for i := 0; i < goals.Len(); i++ {
 			records = append(records, goals.Index(i).Interface())
@@ -256,15 +243,15 @@ var allInVainMutex = sync.Mutex{}
 
 // Remove from database (Do not use leading * in name with this function)
 // TODO: enable field tag configuration
-// TODO: !!!IMPORTANT!!! support slice type arguments
 func (gg *GoGetter) AllInVain(name string, dreams ...Dream) (err error) {
 	allInVainMutex.Lock()
 	defer allInVainMutex.Unlock()
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		err = fmt.Errorf("%+v", r)
-	// 	}
-	// }()
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%+v", r)
+		}
+	}()
 
 	if len(dreams) == 1 && reflect.TypeOf(dreams[0]).Kind() == reflect.Slice {
 		packedDreams := reflect.ValueOf(dreams[0])
@@ -288,14 +275,12 @@ func (gg *GoGetter) AllInVain(name string, dreams ...Dream) (err error) {
 
 	records := []Record{}
 	for i, _ := range dreams {
-		// TODO: use func to acess Record
-		records = append(records, dreams[i].(Record))
+		records = append(records, gg.retrieveRecord(dreams[i]))
 	}
 
 	restDreams := []Dream{}
 	for _, dream := range gg.dreams[name] {
-		// TODO: use func to acess Record
-		dreamRecord := dream.(Record)
+		dreamRecord := gg.retrieveRecord(dream)
 		for _, dyingDream := range records {
 			if reflect.DeepEqual(dreamRecord.Identity(), dyingDream.Identity()) {
 				goto hell
@@ -308,15 +293,55 @@ func (gg *GoGetter) AllInVain(name string, dreams ...Dream) (err error) {
 	}
 	gg.dreams[name] = restDreams
 
-	return gg.db.Remove(table, records...)
+	if gg.db != nil {
+		err = gg.db.Remove(table, records...)
+	}
+
+	return
+}
+
+func (gg *GoGetter) retrieveRecord(dream Dream) (record Record) {
+	dv := reflect.ValueOf(dream)
+
+retriving:
+	if !dv.MethodByName("Identity").IsValid() {
+		if dv.Type().Kind() == reflect.Ptr {
+			dv = dv.Elem()
+			goto retriving
+		} else {
+			return nil
+		}
+	} else {
+		record = dv.Interface().(Record)
+	}
+	return
+}
+
+func Apocalypse(names ...string) (err error) {
+	return defaultGetter.Apocalypse(names...)
 }
 
 func (gg *GoGetter) Apocalypse(names ...string) (err error) {
-	// if len(names) == 0 {
-	// 	for k, _ := range gg.dreams {
-	// 		// names =
-	// 	}
-	// }
+	if len(names) == 0 {
+		for k, _ := range gg.dreams {
+			names = append(names, k)
+		}
+	}
+
+	errchan := make(chan error)
+	for i, _ := range names {
+		name := names[i]
+		go func() {
+			errchan <- gg.AllInVain(name)
+		}()
+	}
+	for i := 0; i < len(names); i++ {
+		er := <-errchan
+		if er == nil {
+			continue
+		}
+		err = errors.New(err.Error() + er.Error())
+	}
 
 	return
 }
