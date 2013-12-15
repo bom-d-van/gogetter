@@ -87,11 +87,11 @@ func SetDefaultGetterDb(db Database) {
 // func Raise(children, parent string, lessons ...Lesson) {
 // }
 
-func Grow(name string, lessons ...Lesson) (Dream, error) {
+func Grow(name string, lessons ...Lesson) (dreams Dream, err error) {
 	return defaultGetter.Grow(name, lessons...)
 }
 
-// Realize is similar
+// Realize is similar to Grow, except for inserting records/docs in a provided database.
 func Realize(name string, lessons ...Lesson) (dreams Dream, err error) {
 	return defaultGetter.Realize(name, lessons...)
 }
