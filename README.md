@@ -7,7 +7,7 @@ Gogetter is designed to be a testing tool.
 
 # Usage
 
-```golang
+```go
 type User struct {
 	Id    bson.ObjectId `bson:"_id"`
 	Name  string
