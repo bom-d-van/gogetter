@@ -62,7 +62,8 @@ func GetTableName(name string) (table string, err error) {
 
 // SetGoal will save the Goal globally, then all gogetter values could share
 // the same set of goals.
-// Note:
+//
+// 	Note:
 // 	1. Leading asterisk (*) in name is saved for gogetter.
 // 	2. The return value of goal must be a Struct, map or anything else is not supported.
 func SetGoal(name string, goal Goal) {
