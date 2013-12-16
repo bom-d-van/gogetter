@@ -88,6 +88,7 @@ func SetDefaultGetterDb(db Database) {
 // func Raise(children, parent string, lessons ...Lesson) {
 // }
 
+// See (gg *GoGetter) Grow.
 func Grow(name string, lessons ...Lesson) (dreams Dream, err error) {
 	return defaultGetter.Grow(name, lessons...)
 }
@@ -97,6 +98,7 @@ func Realize(name string, lessons ...Lesson) (dreams Dream, err error) {
 	return defaultGetter.Realize(name, lessons...)
 }
 
+// See (gg *GoGetter) AllInVain.
 func AllInVain(name string, dreams ...Dream) (err error) {
 	return defaultGetter.AllInVain(name, dreams...)
 }
@@ -242,8 +244,17 @@ func (gg *GoGetter) Realize(name string, lessons ...Lesson) (dreams Dream, err e
 
 var allInVainMutex = sync.Mutex{}
 
-// Remove from database (Do not use leading * in name with this function)
-// TODO: enable field tag configuration
+// TODO: [AllInVain] enable field tag configuration
+
+//
+// Destroy data created by Grow/Realize (Do not use leading * in name with this function).
+//
+// Usage:
+//
+// 	gogetter.AllInVain("Users") // Will destory all "Users"
+// 	gogetter.AllInVain("Users", user1, user2) // Only destory user1 and user2
+// 	gogetter.AllInVain("users", users) // users is a slice of User
+//
 func (gg *GoGetter) AllInVain(name string, dreams ...Dream) (err error) {
 	allInVainMutex.Lock()
 	defer allInVainMutex.Unlock()
@@ -377,10 +388,20 @@ func getDreamIdField(name string) (id string) {
 	return
 }
 
+// See (gg *GoGetter) Apocalypse.
 func Apocalypse(names ...string) (err error) {
 	return defaultGetter.Apocalypse(names...)
 }
 
+// Apocalypse is designed as a handy method to replace AllInVain in cases like
+// simply wipe out all data created by Grow/Realize.
+//
+// Usage:
+//
+// 	gogetter.Apocalypse("Users") // Will remove all "Users" data
+// 	gogetter.Apocalypse("Users", "Another Goals") // Will remove all "Users" and "Another Goals" data
+// 	gogetter.Apocalypse() // Will destroy all data
+//
 func (gg *GoGetter) Apocalypse(names ...string) (err error) {
 	if len(names) == 0 {
 		for k, _ := range gg.dreams {
