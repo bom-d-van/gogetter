@@ -22,9 +22,9 @@ type User struct {
 	ThereGreatIdeas [3]string
 }
 
-func (u User) Identity() interface{} {
-	return u.Id
-}
+// func (u User) Identity() interface{} {
+// 	return u.Id
+// }
 
 type DreamS struct {
 	Title   string
@@ -215,16 +215,40 @@ func (s *GoGetterSuite) TestGetTableName(c *C) {
 	c.Check(table, Equals, "capital__and_spaces")
 }
 
-func (s *GoGetterSuite) TestRetrieveRecord(c *C) {
-	var record Record
+func (s *GoGetterSuite) TestRetrieveDreamId(c *C) {
+	var id interface{}
 	puser := User{}
-	record = defaultGetter.retrieveRecord(puser)
-	c.Check(record, Not(Equals), nil)
-	record = defaultGetter.retrieveRecord(&puser)
-	c.Check(record, Not(Equals), nil)
+	id = defaultGetter.retrieveDreamId(puser, "Id")
+	c.Check(id, Not(Equals), nil)
+	id = defaultGetter.retrieveDreamId(&puser, "Id")
+	c.Check(id, Not(Equals), nil)
 	ppuser := &User{}
-	record = defaultGetter.retrieveRecord(&ppuser)
-	c.Check(record, Not(Equals), nil)
+	id = defaultGetter.retrieveDreamId(&ppuser, "Id")
+	c.Check(id, Not(Equals), nil)
+}
+
+func (s *GoGetterSuite) TestGetDreamIdField(c *C) {
+	cidCalledCount := 0
+	SetGoal("CustomId", func() Dream {
+		cidCalledCount += 1
+		return struct {
+			CustomId string `gogetter:"id"`
+		}{}
+	})
+
+	c.Check(getDreamIdField("CustomId"), Equals, "CustomId")
+
+	// Should cached DreamId
+	getDreamIdField("CustomId")
+	getDreamIdField("CustomId")
+	c.Check(cidCalledCount, Equals, 1)
+
+	SetGoal("WithOutId", func() Dream {
+		return struct {
+		}{}
+	})
+
+	c.Check(getDreamIdField("WithOutId"), Equals, "")
 }
 
 // func (s *GoGetterSuite) TestGetWithInspiration(c *C) {

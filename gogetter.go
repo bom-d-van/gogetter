@@ -58,17 +58,18 @@ func GetTableName(name string) (table string, err error) {
 	return
 }
 
-var mux = sync.Mutex{}
+// var mux = sync.Mutex{}
 
 // SetGoal will save the Goal globally, then all gogetter values could share
 // the same set of goals.
-// Note: Leading asterisk (*) in name is saved for gogetter.
+// Note:
+// 	1. Leading asterisk (*) in name is saved for gogetter.
+// 	2. The return value of goal must be a Struct, map or anything else is not supported.
 func SetGoal(name string, goal Goal) {
-	mux.Lock()
-	defer mux.Unlock()
+	// mux.Lock()
+	// defer mux.Unlock()
 
 	goalMap[name] = goal
-	// goalMap["*"+name] = goal
 }
 
 func GetGoal(name string) Goal {
@@ -273,47 +274,106 @@ func (gg *GoGetter) AllInVain(name string, dreams ...Dream) (err error) {
 		}
 	}
 
-	records := []Record{}
-	for i, _ := range dreams {
-		records = append(records, gg.retrieveRecord(dreams[i]))
+	idField := getDreamIdField(name)
+	if idField == "" {
+		err = errors.New("Id Field is Not Exist")
+		return
 	}
 
-	restDreams := []Dream{}
+	// records := []Record{}
+	ids := []interface{}{}
+	for i, _ := range dreams {
+		// records = append(records, gg.retrieveRecord(dreams[i]))
+		ids = append(ids, gg.retrieveDreamId(dreams[i], idField))
+	}
+
+	survivedDreams := []Dream{}
 	for _, dream := range gg.dreams[name] {
-		dreamRecord := gg.retrieveRecord(dream)
-		for _, dyingDream := range records {
-			if reflect.DeepEqual(dreamRecord.Identity(), dyingDream.Identity()) {
+		// dreamRecord := gg.retrieveRecord(dream)
+		dreamId := gg.retrieveDreamId(dream, idField)
+		// for _, dyingDream := range records {
+		for _, id := range ids {
+			// if reflect.DeepEqual(dreamRecord.Identity(), dyingDream.Identity()) {
+			if reflect.DeepEqual(id, dreamId) {
 				goto hell
 			}
 		}
 
-		restDreams = append(restDreams, dream)
+		survivedDreams = append(survivedDreams, dream)
 
 	hell:
 	}
-	gg.dreams[name] = restDreams
+	gg.dreams[name] = survivedDreams
 
 	if gg.db != nil {
-		err = gg.db.Remove(table, records...)
+		err = gg.db.Remove(table, ids...)
 	}
 
 	return
 }
 
-func (gg *GoGetter) retrieveRecord(dream Dream) (record Record) {
+func (gg *GoGetter) retrieveDreamId(dream Dream, idField string) (id interface{}) {
 	dv := reflect.ValueOf(dream)
 
 retriving:
-	if !dv.MethodByName("Identity").IsValid() {
-		if dv.Type().Kind() == reflect.Ptr {
-			dv = dv.Elem()
-			goto retriving
-		} else {
-			return nil
-		}
+	// TODO: refactor
+	if dv.Type().Kind() == reflect.Ptr {
+		dv = dv.Elem()
+		goto retriving
 	} else {
-		record = dv.Interface().(Record)
+		idFieldV := dv.FieldByName(idField)
+		if idFieldV.IsValid() {
+			id = idFieldV.Interface()
+		}
 	}
+
+	return
+}
+
+var defaultTableId = "Id"
+
+// Table Id is used when gogetter is trying remove records from table, using a simple
+// sql/mongo statement to remove the data.
+// Default Table Id is "Id", its value must be comparable via reflect.DeepEqual.
+func SetDefaultTableId(name string) {
+	defaultTableId = name
+}
+
+var dreamIdFieldMap = map[string]string{}
+
+func getDreamIdField(name string) (id string) {
+	var ok bool
+	if id, ok = dreamIdFieldMap[name]; ok {
+		return
+	}
+
+	// Validation of Goal must make before calling this method
+	dType := reflect.TypeOf(GetGoal(name)())
+	for {
+		// TODO: refactor
+		if dType.Kind() == reflect.Ptr {
+			dType = dType.Elem()
+		} else {
+			break
+		}
+	}
+
+	for i := 0; i < dType.NumField(); i++ {
+		field := dType.Field(i)
+		gogetterTag := field.Tag.Get("gogetter")
+		if gogetterTag == "id" {
+			id = field.Name
+			break
+		}
+	}
+
+	if id == "" {
+		if _, ok := dType.FieldByName(defaultTableId); ok {
+			id = defaultTableId
+		}
+	}
+
+	dreamIdFieldMap[name] = id
 	return
 }
 

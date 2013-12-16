@@ -15,6 +15,13 @@ func (s *MongoDbSuite) SetUpSuite(c *C) {
 	// c.Check(err, Equals, nil)
 	// s.MongoDb = NewMongoDb(session.DB("gogetter"))
 	s.MongoDb = NewMongoDb(getTestDb())
+	_, err := s.db.C("mongousers").RemoveAll(nil)
+	c.Check(err, Equals, nil)
+}
+
+func (s *MongoDbSuite) TearDownSuite(c *C) {
+	_, err := s.db.C("mongousers").RemoveAll(nil)
+	c.Check(err, Equals, nil)
 }
 
 func getTestDb() *mgo.Database {
@@ -27,14 +34,14 @@ func getTestDb() *mgo.Database {
 
 func (s *MongoDbSuite) TestDbOperation(c *C) {
 	user := User{Id: bson.NewObjectId(), Name: "a user"}
-	err := s.Create("users", user)
+	err := s.Create("mongousers", user)
 	c.Check(err, Equals, nil)
-	count, err := s.db.C("users").Find(bson.M{"name": "a user"}).Count()
+	count, err := s.db.C("mongousers").Find(bson.M{"name": "a user"}).Count()
 	c.Check(err, Equals, nil)
 	c.Check(count, Equals, 1)
 
-	s.Remove("users", user)
-	count, err = s.db.C("users").Find(bson.M{"name": "a user"}).Count()
+	s.Remove("mongousers", user.Id)
+	count, err = s.db.C("mongousers").Find(bson.M{"name": "a user"}).Count()
 	c.Check(err, Equals, nil)
 	c.Check(count, Equals, 0)
 }

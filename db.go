@@ -1,21 +1,14 @@
 package gogetter
 
 import (
+	// "github.com/eaigner/hood"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 )
 
-// type Indentity interface {
-// 	EqualTo(Indentity) bool
-// }
-
-type Record interface {
-	Identity() interface{}
-}
-
 type Database interface {
 	Create(table string, data ...interface{}) (err error)
-	Remove(table string, records ...Record) (err error)
+	Remove(table string, ids ...interface{}) (err error)
 }
 
 type MongoDb struct {
@@ -34,11 +27,33 @@ func (m *MongoDb) Create(col string, docs ...interface{}) (err error) {
 	return m.db.C(col).Insert(docs...)
 }
 
-func (m *MongoDb) Remove(col string, docs ...Record) (err error) {
-	ids := []interface{}{}
-	for _, doc := range docs {
-		ids = append(ids, doc.Identity())
-	}
+func (m *MongoDb) Remove(col string, ids ...interface{}) (err error) {
 	_, err = m.db.C(col).RemoveAll(bson.M{"_id": bson.M{"$in": ids}})
 	return
 }
+
+// type Hood struct {
+// 	hood *hood.Hood
+// }
+
+// func NewHood(hood *hood.Hood) *Hood {
+// 	return &Hood{
+// 		primaryKey: primaryKey,
+// 		hood:       hood,
+// 	}
+// }
+
+// func (m *Hood) Create(table string, records ...interface{}) (err error) {
+// 	if len(records) == 0 {
+// 		return
+// 	}
+
+// 	m.hood.CreateTableIfNotExists(table)
+
+// 	return
+// }
+
+// func (m *Hood) Remove(table string, docs ...interface{}) (err error) {
+// 	_, err = m.db.C(table).RemoveAll(bson.M{"_id": bson.M{"$in": ids}})
+// 	return
+// }

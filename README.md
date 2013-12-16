@@ -2,7 +2,7 @@
 
 A simple factory girl port with a simple database cleaner interface, in Golang.
 
-Gogetter is designed to be a testing tool.
+gogetter is designed to be a testing tool.
 
 Serious Api is [here](http://godoc.org/github.com/bom-d-van/gogetter).
 
