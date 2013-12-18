@@ -153,5 +153,25 @@ func (s *GetterDbSuite) TestApocalypseWithoutNames(c *C) {
 	c.Check(defaultGetter.dreams["Pointer User"], HasLen, 0)
 }
 
+func (s *GetterDbSuite) TestAscendGoals(c *C) {
+	superUsersI, err := Realize("*Super User", Lesson{"Name": "Super 1"}, Lesson{"Name": "Super 2"})
+	c.Check(err, Equals, nil)
+	superUsers := superUsersI.([]*User)
+	count, err := s.db.C("users").FindId(bson.M{"$in": []bson.ObjectId{superUsers[0].Id, superUsers[1].Id}}).Count()
+	c.Check(err, Equals, nil)
+	c.Check(count, Equals, 2)
+
+	c.Check(defaultGetter.dreams["Super User"], HasLen, 2)
+	c.Check(defaultGetter.dreams["Super User"][0].(*User).Name, Equals, "Super 1")
+	c.Check(defaultGetter.dreams["Super User"][1].(*User).Name, Equals, "Super 2")
+
+	Apocalypse("Super User")
+
+	c.Check(defaultGetter.dreams["Super User"], HasLen, 0)
+	count, err = s.db.C("users").FindId(bson.M{"$in": []bson.ObjectId{superUsers[0].Id, superUsers[1].Id}}).Count()
+	c.Check(err, Equals, nil)
+	c.Check(count, Equals, 0)
+}
+
 // TODO:
 // 	3. Test Realize With Pointer

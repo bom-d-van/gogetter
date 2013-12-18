@@ -37,10 +37,17 @@ func init() {
 		user := makeUser()
 		return &user
 	})
+
+	AscendGoal("Super User", "User", func() Lesson {
+		return Lesson{
+			"Name": "Super User",
+		}
+	})
 }
 
 func makeUser() User {
 	return User{
+		Id:              bson.NewObjectId(),
 		Name:            "name",
 		Dream:           &DreamS{Title: "My Dream"},
 		VisitedPlaces:   []string{"New York City", "San Franciso"},
@@ -249,6 +256,12 @@ func (s *GoGetterSuite) TestGetDreamIdField(c *C) {
 	})
 
 	c.Check(getDreamIdField("WithOutId"), Equals, "")
+}
+
+func (s *GoGetterSuite) TestGetTableNameOfAscendGoals(c *C) {
+	table, err := GetTableName("Super User")
+	c.Check(err, Equals, nil)
+	c.Check(table, Equals, "users")
 }
 
 // func (s *GoGetterSuite) TestGetWithInspiration(c *C) {

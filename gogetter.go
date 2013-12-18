@@ -51,8 +51,13 @@ func GetTableName(name string) (table string, err error) {
 		return "", ErrGetterNotExist
 	}
 
-	table = inflect.Pluralize(strings.ToLower(name))
-	table = strings.Replace(table, " ", "_", -1)
+	if pg, yes := parentGoalMap[name]; yes {
+		table, err = GetTableName(pg.parent)
+	} else {
+		table = inflect.Pluralize(strings.ToLower(name))
+		table = strings.Replace(table, " ", "_", -1)
+	}
+
 	tableNameMap[name] = table
 
 	return
@@ -86,8 +91,18 @@ func SetDefaultGetterDb(db Database) {
 	defaultGetter.db = db
 }
 
-// func Raise(children, parent string, lessons ...Lesson) {
-// }
+type parentGoal struct {
+	parent string
+	lesson func() Lesson
+}
+
+var parentGoalMap = map[string]*parentGoal{}
+
+// By default, GetTableName will use parent's table name.
+func AscendGoal(child, parent string, lesson func() Lesson) {
+	SetGoal(child, goalMap[parent])
+	parentGoalMap[child] = &parentGoal{parent, lesson}
+}
 
 // See (gg *GoGetter) Grow.
 func Grow(name string, lessons ...Lesson) (dreams Dream, err error) {
@@ -193,6 +208,12 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 				dst.FieldByIndex(fIndex).Set(v)
 			}
 
+			if pg, yes := parentGoalMap[name]; yes {
+				for k, v := range pg.lesson() {
+					dst.FieldByName(k).Set(reflect.ValueOf(v))
+				}
+			}
+
 			lesson := lessons[index]
 			for k, v := range lesson {
 				dst.FieldByName(k).Set(reflect.ValueOf(v))
@@ -203,6 +224,7 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 	}
 
 	// Receive Dreams
+	// TODO: Could be replaced by a simple interface{}?
 	goals := reflect.MakeSlice(reflect.SliceOf(dType), 0, 0)
 	for i := 0; i < len(lessons); i++ {
 		goal, _ := goalChan.Recv()
@@ -427,6 +449,3 @@ func (gg *GoGetter) Apocalypse(names ...string) (err error) {
 
 	return
 }
-
-// func (gg *GoGetter) Raise(children, parent string, lessons ...Lesson) {
-// }
