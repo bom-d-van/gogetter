@@ -16,6 +16,11 @@ type Lesson map[string]Dream
 // TODO: Support Special Type
 // type Inspiration func() Dream
 
+type Database interface {
+	Create(table string, data ...interface{}) (err error)
+	Remove(table string, ids ...interface{}) (err error)
+}
+
 type GoGetter struct {
 	dreams map[string][]Dream
 	db     Database
@@ -208,6 +213,7 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 				dst.FieldByIndex(fIndex).Set(v)
 			}
 
+			// TODO: Support nested Raise, i.e., the parent of a child goal also could has its own parent
 			if pg, yes := parentGoalMap[name]; yes {
 				for k, v := range pg.lesson() {
 					dst.FieldByName(k).Set(reflect.ValueOf(v))
@@ -246,6 +252,8 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 			records = append(records, goals.Index(i).Interface())
 		}
 		err = gg.db.Create(table, records...)
+
+		// TODO: add after create tag support, for some data will only be assigned after saved in database
 	}
 
 	// Return userful/handy results

@@ -1,6 +1,7 @@
 package gogetter
 
 import (
+	"github.com/bom-d-van/gogetter/mgodriver"
 	"labix.org/v2/mgo/bson"
 	. "launchpad.net/gocheck"
 	"testing"
@@ -179,7 +180,7 @@ func (s *GoGetterSuite) TestCollectDreamsCorrectly(c *C) {
 
 func (s *GoGetterSuite) TestRealize(c *C) {
 	db := getTestDb()
-	SetDefaultGetterDb(NewMongoDb(db))
+	SetDefaultGetterDb(mgodriver.NewMongoDb(db))
 	usersI, err := Realize("User", Lesson{
 		"Id":   bson.NewObjectId(),
 		"Name": "New Name",

@@ -1,14 +1,23 @@
-package gogetter
+package mgodriver
 
 import (
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	. "launchpad.net/gocheck"
+	"testing"
 )
+
+// Hook up gocheck into the "go test" runner.
+func Test(t *testing.T) { TestingT(t) }
 
 type MongoDbSuite struct{ *MongoDb }
 
 var _ = Suite(&MongoDbSuite{})
+
+type User struct {
+	Id   bson.ObjectId `bson:"_id"`
+	Name string
+}
 
 func (s *MongoDbSuite) SetUpSuite(c *C) {
 	// session, err := mgo.Dial("localhost")

@@ -1,6 +1,7 @@
 package gogetter
 
 import (
+	"github.com/bom-d-van/gogetter/mgodriver"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	. "launchpad.net/gocheck"
@@ -30,7 +31,15 @@ func makePUser() *User {
 
 func (s *GetterDbSuite) SetUpSuite(c *C) {
 	s.db = getTestDb()
-	SetDefaultGetterDb(NewMongoDb(s.db))
+	SetDefaultGetterDb(mgodriver.NewMongoDb(s.db))
+}
+
+func getTestDb() *mgo.Database {
+	session, err := mgo.Dial("localhost")
+	if err != nil {
+		panic(err)
+	}
+	return session.DB("gogetter")
 }
 
 func (s *GetterDbSuite) SetUpTest(c *C) {
@@ -163,6 +172,7 @@ func (s *GetterDbSuite) TestAscendGoals(c *C) {
 
 	c.Check(defaultGetter.dreams["Super User"], HasLen, 2)
 	c.Check(defaultGetter.dreams["Super User"][0].(*User).Name, Equals, "Super 1")
+	c.Check(defaultGetter.dreams["Super User"][0].(*User).Dream.Title, Equals, "My Dream")
 	c.Check(defaultGetter.dreams["Super User"][1].(*User).Name, Equals, "Super 2")
 
 	Apocalypse("Super User")
