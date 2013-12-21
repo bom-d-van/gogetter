@@ -133,6 +133,11 @@ func (gg *GoGetter) Grow(name string, lessons ...Lesson) (dreams Dream, err erro
 	return gg.makeDreams(name, false, lessons...)
 }
 
+type spawnChan struct {
+	goal reflect.Value
+	err  error
+}
+
 func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (dreams Dream, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -155,98 +160,37 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 	if inPointer {
 		dType = reflect.PtrTo(dType)
 	}
-	goalChan := reflect.MakeChan(reflect.ChanOf(reflect.BothDir, dType), 1)
+	ch := make(chan spawnChan)
 	if len(lessons) == 0 {
 		lessons = append(lessons, nil)
 	}
-	for i, _ := range lessons {
-		go func(index int) {
-			defer func() {
-				if r := recover(); r != nil {
-					err = fmt.Errorf("%+v", r)
-					goalChan.Send(reflect.Zero(dType))
-				}
-			}()
 
-			var forebear reflect.Value
-			if index == 0 {
-				forebear = firstD
-			} else {
-				forebear = reflect.ValueOf(goal())
-			}
+	go gg.spawnNewDream(lessons[0], firstD, dType, inPointer, name, ch)
 
-			// TODO: refactor
-			var dst, src reflect.Value
-			theone := reflect.New(dType)
-			if inPointer {
-				if forebear.Kind() == reflect.Ptr {
-					src = forebear.Elem()
-					v := reflect.New(src.Type())
-					v.Elem().Set(reflect.New(src.Type()).Elem())
-					vv := reflect.New(v.Type())
-					vv.Elem().Set(v)
-					theone.Elem().Set(vv)
-					dst = theone.Elem().Elem().Elem()
-				} else {
-					src = forebear
-					v := reflect.New(src.Type())
-					v.Elem().Set(reflect.New(src.Type()).Elem())
-					theone.Elem().Set(v)
-					dst = theone.Elem().Elem()
-				}
-			} else {
-				if dType.Kind() == reflect.Ptr {
-					src = forebear.Elem()
-					v := reflect.New(src.Type())
-					v.Elem().Set(reflect.New(src.Type()).Elem())
-					theone.Elem().Set(v)
-					dst = theone.Elem().Elem()
-				} else {
-					src = forebear
-					dst = theone.Elem()
-				}
-			}
-
-			for j := 0; j < src.NumField(); j++ {
-				fIndex := []int{j}
-				v := src.FieldByIndex(fIndex)
-				dst.FieldByIndex(fIndex).Set(v)
-			}
-
-			// TODO: Support nested Raise, i.e., the parent of a child goal also could has its own parent
-			if pg, yes := parentGoalMap[name]; yes {
-				for k, v := range pg.lesson() {
-					dst.FieldByName(k).Set(reflect.ValueOf(v))
-				}
-			}
-
-			lesson := lessons[index]
-			for k, v := range lesson {
-				dst.FieldByName(k).Set(reflect.ValueOf(v))
-			}
-
-			goalChan.Send(theone.Elem())
-		}(i)
+	for i, _ := range lessons[1:] {
+		go gg.spawnNewDreamRaw(lessons[i+1], goal, dType, inPointer, name, ch)
 	}
 
 	// Receive Dreams
 	// TODO: Could be replaced by a simple interface{}?
 	goals := reflect.MakeSlice(reflect.SliceOf(dType), 0, 0)
 	for i := 0; i < len(lessons); i++ {
-		goal, _ := goalChan.Recv()
-		goals = reflect.Append(goals, goal)
-		gg.dreams[name] = append(gg.dreams[name], goal.Interface())
+		egg := <-ch
+		if egg.err != nil {
+			err = egg.err
+			return
+		}
+		goals = reflect.Append(goals, egg.goal)
+		gg.dreams[name] = append(gg.dreams[name], egg.goal.Interface())
 	}
 
-	table := ""
 	if saveInDb && gg.db != nil {
+		table := ""
 		table, err = GetTableName(name)
 		if err != nil {
 			return
 		}
-	}
 
-	if saveInDb && gg.db != nil {
 		records := []interface{}{}
 		for i := 0; i < goals.Len(); i++ {
 			records = append(records, goals.Index(i).Interface())
@@ -267,6 +211,82 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 
 	return
 }
+
+func (gg *GoGetter) spawnNewDreamRaw(lesson Lesson, goal Goal, dType reflect.Type, inPointer bool, name string, ch chan spawnChan) {
+	gg.spawnNewDream(lesson, reflect.ValueOf(goal()), dType, inPointer, name, ch)
+}
+
+func (gg *GoGetter) spawnNewDream(lesson Lesson, forebear reflect.Value, dType reflect.Type, inPointer bool, name string, ch chan spawnChan) {
+	// To Comment out for better debug information
+	defer func() {
+		if r := recover(); r != nil {
+			ch <- spawnChan{
+				goal: reflect.Zero(forebear.Type()),
+				err:  fmt.Errorf("%+v", r),
+			}
+		}
+	}()
+
+	// TODO: refactor
+	var dst, src reflect.Value
+	theone := reflect.New(dType)
+	if inPointer {
+		if forebear.Kind() == reflect.Ptr {
+			src = forebear.Elem()
+			v := reflect.New(src.Type())
+			v.Elem().Set(reflect.New(src.Type()).Elem())
+			vv := reflect.New(v.Type())
+			vv.Elem().Set(v)
+			theone.Elem().Set(vv)
+			dst = theone.Elem().Elem().Elem()
+		} else {
+			src = forebear
+			v := reflect.New(src.Type())
+			v.Elem().Set(reflect.New(src.Type()).Elem())
+			theone.Elem().Set(v)
+			dst = theone.Elem().Elem()
+		}
+	} else {
+		if dType.Kind() == reflect.Ptr {
+			src = forebear.Elem()
+			v := reflect.New(src.Type())
+			v.Elem().Set(reflect.New(src.Type()).Elem())
+			theone.Elem().Set(v)
+			dst = theone.Elem().Elem()
+		} else {
+			src = forebear
+			dst = theone.Elem()
+		}
+	}
+
+	for j := 0; j < src.NumField(); j++ {
+		fIndex := []int{j}
+		v := src.FieldByIndex(fIndex)
+		dst.FieldByIndex(fIndex).Set(v)
+	}
+
+	// TODO: Support nested Raise, i.e., the parent of a child goal also could has its own parent
+	if pg, yes := parentGoalMap[name]; yes {
+		for k, v := range pg.lesson() {
+			dst.FieldByName(k).Set(reflect.ValueOf(v))
+		}
+	}
+
+	for k, v := range lesson {
+		dst.FieldByName(k).Set(reflect.ValueOf(v))
+	}
+
+	ch <- spawnChan{
+		goal: theone.Elem(),
+		err:  nil,
+	}
+}
+
+// func getElemOfPtr(t reflect.Type, level int) reflect.Value {
+// 	v := reflect.New(t)
+// 	v.Elem().Set(reflect.New(src.Type()).Elem())
+// 	theone.Elem().Set(v)
+// }
 
 // Grow and Create a Record in Database
 func (gg *GoGetter) Realize(name string, lessons ...Lesson) (dreams Dream, err error) {
