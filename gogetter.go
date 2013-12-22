@@ -227,32 +227,20 @@ func (gg *GoGetter) spawnNewDream(lesson Lesson, forebear reflect.Value, dType r
 		}
 	}()
 
-	// TODO: refactor
 	var dst, src reflect.Value
 	theone := reflect.New(dType)
 	if inPointer {
 		if forebear.Kind() == reflect.Ptr {
 			src = forebear.Elem()
-			v := reflect.New(src.Type())
-			v.Elem().Set(reflect.New(src.Type()).Elem())
-			vv := reflect.New(v.Type())
-			vv.Elem().Set(v)
-			theone.Elem().Set(vv)
-			dst = theone.Elem().Elem().Elem()
+			dst = getElemOfPtr(theone, src, 2)
 		} else {
 			src = forebear
-			v := reflect.New(src.Type())
-			v.Elem().Set(reflect.New(src.Type()).Elem())
-			theone.Elem().Set(v)
-			dst = theone.Elem().Elem()
+			dst = getElemOfPtr(theone, src, 1)
 		}
 	} else {
 		if dType.Kind() == reflect.Ptr {
 			src = forebear.Elem()
-			v := reflect.New(src.Type())
-			v.Elem().Set(reflect.New(src.Type()).Elem())
-			theone.Elem().Set(v)
-			dst = theone.Elem().Elem()
+			dst = getElemOfPtr(theone, src, 1)
 		} else {
 			src = forebear
 			dst = theone.Elem()
@@ -282,11 +270,18 @@ func (gg *GoGetter) spawnNewDream(lesson Lesson, forebear reflect.Value, dType r
 	}
 }
 
-// func getElemOfPtr(t reflect.Type, level int) reflect.Value {
-// 	v := reflect.New(t)
-// 	v.Elem().Set(reflect.New(src.Type()).Elem())
-// 	theone.Elem().Set(v)
-// }
+func getElemOfPtr(theone reflect.Value, src reflect.Value, level int) (dst reflect.Value) {
+	v := reflect.New(src.Type())
+	dst = v.Elem()
+	for i := 0; i < level-1; i++ {
+		vv := reflect.New(v.Type())
+		vv.Elem().Set(v)
+		v = vv
+	}
+	theone.Elem().Set(v)
+
+	return
+}
 
 // Grow and Create a Record in Database
 func (gg *GoGetter) Realize(name string, lessons ...Lesson) (dreams Dream, err error) {
