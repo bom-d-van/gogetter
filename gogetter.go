@@ -18,7 +18,7 @@ type Lesson map[string]Dream
 
 type Database interface {
 	Create(table string, data ...interface{}) (err error)
-	Remove(table string, ids ...interface{}) (err error)
+	Remove(table string, idField string, ids ...interface{}) (err error)
 }
 
 type GoGetter struct {
@@ -185,19 +185,10 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 	}
 
 	if saveInDb && gg.db != nil {
-		table := ""
-		table, err = GetTableName(name)
+		err = gg.createRecords(name, goals)
 		if err != nil {
 			return
 		}
-
-		records := []interface{}{}
-		for i := 0; i < goals.Len(); i++ {
-			records = append(records, goals.Index(i).Interface())
-		}
-		err = gg.db.Create(table, records...)
-
-		// TODO: add after create tag support, for some data will only be assigned after saved in database
 	}
 
 	// Return userful/handy results
@@ -208,6 +199,24 @@ func (gg *GoGetter) makeDreams(name string, saveInDb bool, lessons ...Lesson) (d
 	} else {
 		dreams = goals.Interface()
 	}
+
+	return
+}
+
+func (gg *GoGetter) createRecords(name string, goals reflect.Value) (err error) {
+	table := ""
+	table, err = GetTableName(name)
+	if err != nil {
+		return
+	}
+
+	records := []interface{}{}
+	for i := 0; i < goals.Len(); i++ {
+		records = append(records, goals.Index(i).Interface())
+	}
+	err = gg.db.Create(table, records...)
+
+	// TODO: add after create tag support, for some data will only be assigned after saved in database
 
 	return
 }
@@ -254,9 +263,14 @@ func (gg *GoGetter) spawnNewDream(lesson Lesson, forebear reflect.Value, dType r
 	}
 
 	// TODO: Support nested Raise, i.e., the parent of a child goal also could has its own parent
-	if pg, yes := parentGoalMap[name]; yes {
-		for k, v := range pg.lesson() {
-			dst.FieldByName(k).Set(reflect.ValueOf(v))
+	if _, yes := parentGoalMap[name]; yes {
+		// for k, v := range pg.lesson() {
+		// 	dst.FieldByName(k).Set(reflect.ValueOf(v))
+		// }
+		for _, lesson := range getParentLessons(name) {
+			for k, v := range lesson {
+				dst.FieldByName(k).Set(reflect.ValueOf(v))
+			}
 		}
 	}
 
@@ -268,6 +282,19 @@ func (gg *GoGetter) spawnNewDream(lesson Lesson, forebear reflect.Value, dType r
 		goal: theone.Elem(),
 		err:  nil,
 	}
+}
+
+func getParentLessons(name string) (lessons []Lesson) {
+	for {
+		pg, ok := parentGoalMap[name]
+		if !ok {
+			break
+		}
+		lessons = append(lessons, pg.lesson())
+		name = pg.parent
+	}
+
+	return
 }
 
 func getElemOfPtr(theone reflect.Value, src reflect.Value, level int) (dst reflect.Value) {
@@ -337,20 +364,15 @@ func (gg *GoGetter) AllInVain(name string, dreams ...Dream) (err error) {
 		return
 	}
 
-	// records := []Record{}
 	ids := []interface{}{}
 	for i, _ := range dreams {
-		// records = append(records, gg.retrieveRecord(dreams[i]))
 		ids = append(ids, gg.retrieveDreamId(dreams[i], idField))
 	}
 
 	survivedDreams := []Dream{}
 	for _, dream := range gg.dreams[name] {
-		// dreamRecord := gg.retrieveRecord(dream)
 		dreamId := gg.retrieveDreamId(dream, idField)
-		// for _, dyingDream := range records {
 		for _, id := range ids {
-			// if reflect.DeepEqual(dreamRecord.Identity(), dyingDream.Identity()) {
 			if reflect.DeepEqual(id, dreamId) {
 				goto hell
 			}
@@ -363,7 +385,7 @@ func (gg *GoGetter) AllInVain(name string, dreams ...Dream) (err error) {
 	gg.dreams[name] = survivedDreams
 
 	if gg.db != nil {
-		err = gg.db.Remove(table, ids...)
+		err = gg.db.Remove(table, idField, ids...)
 	}
 
 	return

@@ -1,27 +1,37 @@
 package hooddriver
 
-// type Hood struct {
-// 	hood *hood.Hood
-// }
+import (
+	"database/sql"
+	"github.com/eaigner/hood"
+	_ "github.com/go-sql-driver/mysql"
+)
 
-// func NewHood(hood *hood.Hood) *Hood {
-// 	return &Hood{
-// 		primaryKey: primaryKey,
-// 		hood:       hood,
-// 	}
-// }
+type Hood struct {
+	hood *hood.Hood
+}
 
-// func (m *Hood) Create(table string, records ...interface{}) (err error) {
-// 	if len(records) == 0 {
-// 		return
-// 	}
+func NewHood(hood *hood.Hood) *Hood {
+	return &Hood{hood: hood}
+}
 
-// 	m.hood.CreateTableIfNotExists(table)
+func (m *Hood) Create(table string, records ...interface{}) (err error) {
+	hd := m.hood.Begin()
+	err = hd.CreateTableIfNotExists(&User{})
+	if err != nil {
+		return
+	}
+	hd.Commit()
 
-// 	return
-// }
+	hd = m.hood.Begin()
+	_, err = hd.SaveAll(&records)
+	hd.Commit()
 
-// func (m *Hood) Remove(table string, docs ...interface{}) (err error) {
-// 	_, err = m.db.C(table).RemoveAll(bson.M{"_id": bson.M{"$in": ids}})
-// 	return
-// }
+	return
+}
+
+func (m *Hood) Remove(table string, idField string, ids ...interface{}) (err error) {
+	hd := m.hood.Begin()
+	err = hd.Where(idField, "IN", ids).DeleteFrom(table)
+	hd.Commit()
+	return
+}
