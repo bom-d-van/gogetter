@@ -262,20 +262,13 @@ func (gg *GoGetter) spawnNewDream(lesson Lesson, forebear reflect.Value, dType r
 		dst.FieldByIndex(fIndex).Set(v)
 	}
 
-	// TODO: Support nested Raise, i.e., the parent of a child goal also could has its own parent
-	if _, yes := parentGoalMap[name]; yes {
-		// for k, v := range pg.lesson() {
-		// 	dst.FieldByName(k).Set(reflect.ValueOf(v))
-		// }
-		for _, lesson := range getParentLessons(name) {
-			for k, v := range lesson {
-				dst.FieldByName(k).Set(reflect.ValueOf(v))
-			}
+	lessons := []Lesson{lesson}
+	lessons = append(lessons, getParentLessons(name)...)
+	for i := len(lessons) - 1; i >= 0; i-- {
+		lesson := lessons[i]
+		for k, v := range lesson {
+			dst.FieldByName(k).Set(reflect.ValueOf(v))
 		}
-	}
-
-	for k, v := range lesson {
-		dst.FieldByName(k).Set(reflect.ValueOf(v))
 	}
 
 	ch <- spawnChan{

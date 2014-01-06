@@ -268,6 +268,7 @@ func (s *GoGetterSuite) TestGetTableNameOfAscendGoals(c *C) {
 func (s *GoGetterSuite) TestNestedAscendGoals(c *C) {
 	AscendGoal("Super Super User", "Super User", func() Lesson {
 		return Lesson{
+			"Name": "Super Super User",
 			"Dream": &DreamS{
 				Title: "Super Super Dream",
 			},
@@ -277,7 +278,7 @@ func (s *GoGetterSuite) TestNestedAscendGoals(c *C) {
 	userI, err := Grow("*Super Super User")
 	c.Check(err, Equals, nil)
 	user := userI.(*User)
-	c.Check(user.Name, Equals, "Super User")
+	c.Check(user.Name, Equals, "Super Super User")
 	c.Check(user.Dream.Title, Equals, "Super Super Dream")
 }
 
